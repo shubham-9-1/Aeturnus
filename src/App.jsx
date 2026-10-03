@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import "./App.css";
 
 const engineStates = [
@@ -107,12 +108,12 @@ function App() {
           <a href="#security" onClick={() => setMenuOpen(false)}>
             Security
           </a>
-          <a href="#login" onClick={() => setMenuOpen(false)}>
+          <Link to="/login" onClick={() => setMenuOpen(false)}>
             Login
-          </a>
-          <a href="#start" className="nav-button" onClick={() => setMenuOpen(false)}>
+          </Link>
+          <Link to="/signup" className="nav-button" onClick={() => setMenuOpen(false)}>
             Get Started
-          </a>
+          </Link>
         </nav>
       </header>
 
@@ -134,10 +135,10 @@ function App() {
             </p>
 
             <div className="hero-actions">
-              <a href="#start" className="primary-button">
+              <Link to="/signup" className="primary-button">
                 Build Your Continuity
                 <span>↗</span>
-              </a>
+              </Link>
 
               <a href="#engine" className="text-button">
                 See how it works
@@ -558,10 +559,10 @@ function App() {
             that matter to you.
           </p>
 
-          <a href="#login" className="primary-button dark-button">
+          <Link to="/signup" className="primary-button dark-button">
             Get Started
             <span>↗</span>
-          </a>
+          </Link>
         </section>
       </main>
 
@@ -588,7 +589,7 @@ function App() {
           <div>
             <span>PLATFORM</span>
             <a href="#security">Security</a>
-            <a href="#start">Get Started</a>
+            <Link to="/signup">Get Started</Link>
           </div>
         </div>
 

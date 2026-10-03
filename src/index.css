@@ -1,3 +1,5 @@
+@import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap");
+
 * {
   box-sizing: border-box;
 }
@@ -8,12 +10,23 @@ html {
 
 body {
   margin: 0;
-  font-family: Arial, sans-serif;
-  background: #f8f7f3;
+  font-family: "DM Sans", sans-serif;
+  color: #182722;
+  background: #f6f7f4;
 }
 
 button,
 input,
-textarea {
+textarea,
+select {
   font-family: inherit;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: 3px solid #37805e;
+  outline-offset: 3px;
 }
