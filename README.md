@@ -1,16 +1,36 @@
-# React + Vite
+# 🛡️ Aeturnus
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+> A digital continuity and legacy platform for preserving what matters and ensuring it continues into the future.
 
-Currently, two official plugins are available:
+---
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## 📌 About The Project
 
-## React Compiler
+**Aeturnus** is designed to address the challenge of digital inheritance and legacy preservation. It allows users to securely store critical digital assets, accounts, records, and policies, ensuring seamless transfer and continuity for family members or designated beneficiaries when needed.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+### Key Features
+- 🔒 **Secure Asset Management:** Store essential digital assets and documentation safely.
+- 📋 **Policy & Record Flows:** Guided workflows for adding and updating digital records.
+- 👥 **Beneficiary Management:** Nominate trusted individuals for legacy transfer.
+- 💻 **Modern Dashboard UI:** Fast, intuitive, and responsive interface built with React & Vite.
 
-## Expanding the Oxlint configuration
+---
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and Oxlint's TypeScript related rules in your project.
+## 🛠️ Tech Stack
+
+- **Frontend:** React.js, Tailwind CSS / CSS
+- **Build Tool:** Vite
+- **Code Quality:** Oxlint
+
+---
+
+## 🚀 Getting Started
+
+### Prerequisites
+Make sure you have Node.js installed on your system.
+
+### Installation
+
+1. Clone the repository:
+   ```bash
+   git clone [https://github.com/shubham-9-1/Aeturnus.git](https://github.com/shubham-9-1/Aeturnus.git)
