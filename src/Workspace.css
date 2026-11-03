@@ -739,6 +739,33 @@
   font-size: 11px;
   line-height: 1.55;
 }
+.record-image-preview {
+  display: block;
+  width: 100%;
+  max-height: 220px;
+  margin: 10px 0;
+  border: 1px solid var(--ws-line);
+  border-radius: 8px;
+  object-fit: contain;
+  background: #f6f8f6;
+}
+.record-upload-preview {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.record-upload-preview img {
+  width: min(220px, 60%);
+  max-height: 180px;
+  border: 1px solid var(--ws-line);
+  border-radius: 8px;
+  object-fit: contain;
+}
+.form-error {
+  margin: 0;
+  color: #9a302b;
+  font-size: 11px;
+}
 .record-meta {
   display: flex;
   flex-wrap: wrap;
@@ -777,6 +804,30 @@
   border-radius: 9px;
   background: #f0f6f1;
   color: #3b5846;
+}
+.security-callout {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 19px;
+  padding: 16px 18px;
+  border: 1px solid #d5e2d8;
+  border-radius: 9px;
+  background: #f0f6f1;
+  color: #3b5846;
+}
+.security-callout strong {
+  font-size: 13px;
+}
+.security-callout span,
+.security-callout li {
+  font-size: 11px;
+  line-height: 1.55;
+}
+.security-callout ol {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+  padding-left: 20px;
 }
 .privacy-note > span {
   display: grid;
@@ -902,6 +953,22 @@
   border-top: 1px solid #edf0ed;
   color: #56675d;
   font-size: 11px;
+}
+.policy-message-preview {
+  margin-top: 13px;
+  padding: 12px;
+  border: 1px solid #e1e9e3;
+  border-radius: 8px;
+  background: #f8faf8;
+}
+.policy-message-preview strong {
+  font-size: 10px;
+}
+.policy-message-preview p {
+  margin: 5px 0 0;
+  color: #586a60;
+  font-size: 11px;
+  line-height: 1.5;
 }
 .policy-records > div {
   display: flex;
@@ -1277,6 +1344,24 @@
   font-size: 12px;
   font-weight: 400;
 }
+.phone-input-row {
+  display: grid;
+  grid-template-columns: minmax(150px, 0.9fr) minmax(0, 1fr);
+  gap: 8px;
+}
+.phone-input-row select,
+.phone-input-row input {
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid #cbd8ce;
+  border-radius: 8px;
+  background: #fff;
+  color: #243b2d;
+  font-size: 12px;
+  font-weight: 400;
+}
 .form-field textarea {
   min-height: 105px;
   resize: vertical;
@@ -1341,6 +1426,17 @@
 .record-picker small {
   color: #627369;
   font-size: 9px;
+}
+.record-picker-empty {
+  display: grid;
+  justify-items: start;
+  gap: 9px;
+  padding: 5px 2px 2px;
+}
+.record-picker-empty span {
+  color: #607166;
+  font-size: 11px;
+  line-height: 1.5;
 }
 
 .auth-page {

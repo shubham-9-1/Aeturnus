@@ -49,6 +49,61 @@ const localeOptions = [
   ["en-GB", "United Kingdom · DD/MM/YYYY"],
   ["en-US", "United States · MM/DD/YYYY"],
 ];
+const callingCodes = [
+  ["+91", "India (+91)"],
+  ["+1", "United States / Canada (+1)"],
+  ["+44", "United Kingdom (+44)"],
+  ["+61", "Australia (+61)"],
+  ["+81", "Japan (+81)"],
+  ["+49", "Germany (+49)"],
+  ["+33", "France (+33)"],
+  ["+971", "United Arab Emirates (+971)"],
+];
+
+function splitPhone(phone = "") {
+  const matchedCode = callingCodes
+    .map(([code]) => code)
+    .sort((a, b) => b.length - a.length)
+    .find((code) => phone.trim().startsWith(code));
+  return {
+    code: matchedCode || "+91",
+    number: phone
+      .replace(/^\s*\+\d{1,4}/, "")
+      .replace(/\D/g, "")
+      .slice(-10),
+  };
+}
+
+function localDateValue(date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
+function addMonths(date, months) {
+  const result = new Date(date);
+  const day = result.getDate();
+  result.setDate(1);
+  result.setMonth(result.getMonth() + months);
+  const lastDay = new Date(result.getFullYear(), result.getMonth() + 1, 0).getDate();
+  result.setDate(Math.min(day, lastDay));
+  return result;
+}
+
+function getCheckinReminder(dateValue) {
+  if (!dateValue) return null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const due = new Date(`${dateValue}T00:00:00`);
+  const daysUntil = Math.round((due - today) / 86400000);
+  return daysUntil >= 0 && daysUntil <= 3 ? daysUntil : null;
+}
+
+function getNextCheckinDate(store) {
+  if (store.nextCheckInDate) return store.nextCheckInDate;
+  if (!store.checkIns.length) return null;
+  const fallback = new Date(store.checkIns[0].date);
+  fallback.setDate(fallback.getDate() + 15);
+  return localDateValue(fallback);
+}
 
 function Dashboard() {
   const navigate = useNavigate();
@@ -119,11 +174,37 @@ function Dashboard() {
     const form = event.currentTarget;
     const data = Object.fromEntries(new FormData(form));
 
-    if (modal.type === "record") {
+    if (modal.type === "checkin") {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const dueDate = new Date(`${data.nextCheckInDate}T00:00:00`);
+      const maxDate = addMonths(today, 3);
+      maxDate.setHours(0, 0, 0, 0);
+      if (dueDate <= today || dueDate > maxDate) {
+        setToast("Choose a future check-in date within the next 3 months.");
+        return;
+      }
+      const entry = {
+        id: createId(),
+        date: new Date().toISOString(),
+      };
+      commit(
+        (previous) => ({
+          ...previous,
+          checkIns: [entry, ...previous.checkIns],
+          nextCheckInDate: data.nextCheckInDate,
+          engineState: 0,
+        }),
+        "Safe check-in completed",
+        "Your plan is active. A missed check-in is never treated as proof of death.",
+      );
+      setToast("Check-in complete. Your plan is active.");
+    } else if (modal.type === "record") {
       const status =
         event.nativeEvent.submitter?.value === "draft" ? "Draft" : "Ready";
       const record = {
         ...data,
+        imageData: data.imageData || "",
         kind: modal.kind,
         status,
         id: modal.record?.id || createId(),
@@ -151,7 +232,14 @@ function Dashboard() {
           : "Record saved on this device.",
       );
     } else if (modal.type === "person") {
-      const person = { ...data, id: modal.person?.id || createId() };
+      const person = {
+        ...data,
+        phone: data.phone ? `${data.phoneCountryCode} ${data.phone}` : "",
+        verificationStatus: "pending",
+        emailVerified: false,
+        phoneVerified: false,
+        id: modal.person?.id || createId(),
+      };
       commit(
         (previous) => ({
           ...previous,
@@ -167,6 +255,7 @@ function Dashboard() {
       setToast("Trusted person saved on this device.");
     } else if (modal.type === "policy") {
       const recordIds = new FormData(form).getAll("recordIds");
+      const channels = new FormData(form).getAll("channels");
       if (recordIds.length === 0) {
         setToast("Choose at least one record for this policy.");
         return;
@@ -174,6 +263,7 @@ function Dashboard() {
       const policy = {
         ...data,
         recordIds,
+        channels,
         active: true,
         id: modal.policy?.id || createId(),
       };
@@ -201,7 +291,7 @@ function Dashboard() {
       );
       setToast("Preferences saved on this device.");
     }
-    setModal(null);
+    setModal(modal.returnToPolicy || null);
   }
 
   function deleteItem(type, item) {
@@ -245,17 +335,18 @@ function Dashboard() {
   }
 
   function checkIn() {
-    const entry = { id: createId(), date: new Date().toISOString() };
-    commit(
-      (previous) => ({
-        ...previous,
-        checkIns: [entry, ...previous.checkIns],
-        engineState: 0,
-      }),
-      "Safe check-in completed",
-      "Your plan is active. A missed check-in is never treated as proof of death.",
-    );
-    setToast("Check-in complete. Your plan is active.");
+    const today = new Date();
+    const defaultDate = new Date(today);
+    defaultDate.setDate(defaultDate.getDate() + 15);
+    const maximumDate = addMonths(today, 3);
+    const minimumDate = new Date(today);
+    minimumDate.setDate(minimumDate.getDate() + 1);
+    setModal({
+      type: "checkin",
+      defaultDate: localDateValue(defaultDate),
+      minimumDate: localDateValue(minimumDate),
+      maximumDate: localDateValue(maximumDate),
+    });
   }
 
   function toggleRecordStatus(record) {
@@ -412,6 +503,7 @@ function Dashboard() {
               policies={store.policies}
               people={store.people}
               records={store.records}
+              ownerName={store.profile.name}
               setModal={setModal}
               deleteItem={deleteItem}
               setStore={setStore}
@@ -448,11 +540,15 @@ function Dashboard() {
       )}
       {modal && (
         <WorkspaceModal
+          key={`${modal.type}-${modal.record?.id || "new"}`}
           modal={modal}
           store={store}
           close={() => setModal(null)}
           onSubmit={submitModal}
           onDelete={confirmDelete}
+          onAddRecord={(policyDraft) =>
+            setModal({ type: "record", kind: "Document", returnToPolicy: policyDraft })
+          }
         />
       )}
     </div>
@@ -515,8 +611,8 @@ function Overview({
       store.checkIns.length > 0,
     ],
   ];
-  const nextDate = new Date();
-  nextDate.setDate(nextDate.getDate() + 14);
+  const nextCheckinDate = getNextCheckinDate(store);
+  const reminderDays = getCheckinReminder(nextCheckinDate);
   return (
     <>
       <PageHeader
@@ -574,13 +670,18 @@ function Overview({
             a review process; it never confirms death.
           </p>
           <div className="checkin-meta">
-            <span>Next suggested check-in</span>
+            <span>Next check-in</span>
             <strong>
-              {new Intl.DateTimeFormat(locale, { dateStyle: "medium" }).format(
-                nextDate,
-              )}
+              {nextCheckinDate ? formatDate(nextCheckinDate, locale) : "Not scheduled"}
             </strong>
           </div>
+          {reminderDays !== null && (
+            <p role="status">
+              {reminderDays === 0
+                ? "Your check-in is due today."
+                : `Reminder: your check-in is due in ${reminderDays} day${reminderDays === 1 ? "" : "s"}.`}
+            </p>
+          )}
           <button className="button button-outline" onClick={checkIn}>
             I’m here · Check in
           </button>
@@ -715,6 +816,9 @@ function RecordsPage({
                 </span>
               </div>
               <h2>{record.name}</h2>
+              {record.imageData && (
+                <img className="record-image-preview" src={record.imageData} alt={`Attachment for ${record.name}`} />
+              )}
               <p>{record.description || "No notes added yet."}</p>
               <div className="record-meta">
                 <span>{record.category || "Uncategorized"}</span>
@@ -792,8 +896,10 @@ function PeoplePage({ people, setModal, deleteItem }) {
       <div className="privacy-note">
         <span aria-hidden="true">i</span>
         <p>
-          Only add contact details you have permission to use. This frontend
-          demo does not send invitations or messages.
+          Only add contact details you have permission to use. This browser
+          demo cannot send OTPs or perform identity checks, so every new person
+          remains pending and policy access stays locked. Aadhaar/PAN are not
+          collected or saved here.
         </p>
       </div>
       {people.length ? (
@@ -808,6 +914,11 @@ function PeoplePage({ people, setModal, deleteItem }) {
                 <span className="role-pill">{person.role}</span>
                 <p>{person.email}</p>
                 <p>{person.phone || "No phone added"}</p>
+                <p className="person-verification-status">
+                  {person.verificationStatus === "verified"
+                    ? "Verified · eligible for policy access"
+                    : "Pending verification · access locked"}
+                </p>
                 <p>{person.relationship || "Relationship not specified"}</p>
               </div>
               <div className="card-actions">
@@ -849,6 +960,7 @@ function PoliciesPage({
   policies,
   people,
   records,
+  ownerName,
   setModal,
   deleteItem,
   setStore,
@@ -922,6 +1034,10 @@ function PoliciesPage({
                   <strong>Permission</strong>
                   <span>{policy.permission}</span>
                 </p>
+                <p>
+                  <strong>Notification preference</strong>
+                  <span>{policy.channels?.length ? policy.channels.join(" · ") : "Email"}</span>
+                </p>
                 <div className="policy-records">
                   <strong>Selected records</strong>
                   <div>
@@ -935,6 +1051,15 @@ function PoliciesPage({
                       <span>No selected records</span>
                     )}
                   </div>
+                </div>
+                <div className="policy-message-preview">
+                  <strong>Release message preview</strong>
+                  <p>
+                    {ownerName || "The owner"} assigned {sharedRecords.length} item
+                    {sharedRecords.length === 1 ? "" : "s"} for you. If the
+                    continuity review approves release, use the secure link to
+                    verify your identity and view only these items.
+                  </p>
                 </div>
                 <div className="card-actions">
                   <button
@@ -980,8 +1105,8 @@ function PoliciesPage({
 }
 
 function CheckInsPage({ store, locale, checkIn, advanceSimulation }) {
-  const nextDate = new Date();
-  nextDate.setDate(nextDate.getDate() + 14);
+  const nextCheckinDate = getNextCheckinDate(store);
+  const reminderDays = getCheckinReminder(nextCheckinDate);
   return (
     <>
       <PageHeader
@@ -1005,15 +1130,20 @@ function CheckInsPage({ store, locale, checkIn, advanceSimulation }) {
           </p>
         </div>
         <div className="checkin-next">
-          <span>Suggested next check-in</span>
+          <span>Next scheduled check-in</span>
           <strong>
-            {new Intl.DateTimeFormat(locale, { dateStyle: "long" }).format(
-              nextDate,
-            )}
+            {nextCheckinDate ? formatDate(nextCheckinDate, locale) : "Not scheduled"}
           </strong>
-          <small>Example schedule for this frontend demo</small>
+          <small>Choose a date up to 3 months ahead when you check in.</small>
         </div>
       </section>
+      {reminderDays !== null && (
+        <p className="form-help" role="status">
+          {reminderDays === 0
+            ? "Your check-in is due today."
+            : `Reminder: your check-in is due in ${reminderDays} day${reminderDays === 1 ? "" : "s"}.`}
+        </p>
+      )}
       <section className="section-block">
         <div className="section-heading-row">
           <div>
@@ -1107,7 +1237,7 @@ function ContactPreview({ store }) {
         <span aria-hidden="true">i</span>
         <p>
           This is a local preview for your review. It does not create a contact
-          account, send an invitation or release information.
+          account, send an invitation or release information. A real release requires server-side identity checks; this demo cannot provide them.
         </p>
       </div>
       {store.people.length ? (
@@ -1125,7 +1255,10 @@ function ContactPreview({ store }) {
               ))}
             </select>
           </label>
-          <section className="contact-access-panel">
+          {person?.verificationStatus === "verified" &&
+          person?.emailVerified &&
+          person?.phoneVerified ? (
+            <section className="contact-access-panel">
             <div className="access-panel-heading">
               <div className="person-avatar">
                 {person?.name?.[0]?.toUpperCase()}
@@ -1155,6 +1288,10 @@ function ContactPreview({ store }) {
                     <span className="record-kind">{record.kind}</span>
                     <strong>{record.name}</strong>
                     <span>{record.category}</span>
+                    {record.imageData && (
+                      <img className="record-image-preview" src={record.imageData} alt={`Attachment for ${record.name}`} />
+                    )}
+                    {record.description && <p>{record.description}</p>}
                   </article>
                 ))}
               </div>
@@ -1164,7 +1301,24 @@ function ContactPreview({ store }) {
                 description="That’s the default. Add an access policy only if you choose to share specific records."
               />
             )}
-          </section>
+            </section>
+          ) : (
+            <div className="security-callout">
+              <strong>Claim access is locked</strong>
+              <span>
+                This demo cannot send invitations or verify identity. A production
+                claim should work like this:
+              </span>
+              <ol>
+                <li>Missed check-ins start reminders and independent review; silence alone never releases anything.</li>
+                <li>After approval and a delay window, send a one-time claim link to the assigned person by opted-in email or WhatsApp.</li>
+                <li>Verify the person’s existing phone with a short-lived server OTP; never show or store the OTP in the page.</li>
+                <li>Use a compliant provider for Aadhaar/PAN checks, then retain only a verification reference and masked identifier.</li>
+                <li>Issue a separate account session that can fetch only this person’s assigned records; log every view and download.</li>
+              </ol>
+              <span>Owner records and all other beneficiaries remain inaccessible.</span>
+            </div>
+          )}
         </>
       ) : (
         <EmptyState
@@ -1269,7 +1423,10 @@ function EmptyState({ title, description, action }) {
   );
 }
 
-function WorkspaceModal({ modal, store, close, onSubmit, onDelete }) {
+function WorkspaceModal({ modal, store, close, onSubmit, onDelete, onAddRecord }) {
+  const [imagePreview, setImagePreview] = useState(modal.record?.imageData || "");
+  const [imageError, setImageError] = useState("");
+  const isCheckin = modal.type === "checkin";
   const isRecord = modal.type === "record";
   const isPerson = modal.type === "person";
   const isPolicy = modal.type === "policy";
@@ -1280,7 +1437,9 @@ function WorkspaceModal({ modal, store, close, onSubmit, onDelete }) {
       ? "Delete this item?"
       : modal.type === "record-status"
         ? "Update record status"
-        : isRecord
+        : isCheckin
+          ? "Complete a check-in"
+          : isRecord
           ? `${editing ? "Edit" : "Add"} ${modal.kind.toLowerCase()}`
           : isPerson
             ? `${editing ? "Edit" : "Add"} trusted person`
@@ -1337,15 +1496,38 @@ function WorkspaceModal({ modal, store, close, onSubmit, onDelete }) {
         <p className="page-eyebrow">AETURNUS · FRONTEND DEMO</p>
         <h2 id="modal-title">{title}</h2>
         <p className="modal-intro">
-          {isRecord
+          {isCheckin
+            ? "Your check-in will be recorded today. Choose when the next one is due; 15 days from today is selected by default."
+            : isRecord
             ? "Add useful details only. Keep passwords, PINs and private keys out of this demo."
             : isPerson
-              ? "A contact is not notified or given access by being added here."
+              ? "Add the person and assign a role. Verification is unavailable in this browser demo, so the person will stay pending and will not receive access."
               : isPolicy
                 ? "Choose specific records and the minimum permission needed."
                 : "Choose a region and date format for this device."}
         </p>
         <form className="workspace-form" onSubmit={onSubmit}>
+          {isCheckin && (
+            <>
+              <label className="form-field">
+                Next check-in date
+                <input
+                  type="date"
+                  name="nextCheckInDate"
+                  defaultValue={modal.defaultDate}
+                  min={modal.minimumDate}
+                  max={modal.maximumDate}
+                  required
+                  autoFocus
+                />
+              </label>
+              <div className="modal-actions full-field">
+                <button className="button button-primary" type="submit">
+                  Confirm check-in
+                </button>
+              </div>
+            </>
+          )}
           {isRecord && (
             <>
               <label className="form-field">
@@ -1389,6 +1571,35 @@ function WorkspaceModal({ modal, store, close, onSubmit, onDelete }) {
                   placeholder="What should you or a trusted person know?"
                 />
               </label>
+              <label className="form-field full-field">
+                Photo or image attachment (optional)
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    setImageError("");
+                    if (!file) return;
+                    if (file.size > 2 * 1024 * 1024) {
+                      setImageError("Choose an image smaller than 2 MB.");
+                      event.target.value = "";
+                      return;
+                    }
+                    const reader = new FileReader();
+                    reader.onload = () => setImagePreview(String(reader.result || ""));
+                    reader.onerror = () => setImageError("This image could not be opened.");
+                    reader.readAsDataURL(file);
+                  }}
+                />
+                <input type="hidden" name="imageData" value={imagePreview} />
+              </label>
+              {imagePreview && (
+                <div className="record-upload-preview full-field">
+                  <img src={imagePreview} alt="Selected record attachment preview" />
+                  <button type="button" className="button button-quiet" onClick={() => setImagePreview("")}>Remove image</button>
+                </div>
+              )}
+              {imageError && <p className="form-error full-field" role="alert">{imageError}</p>}
               <label className="form-field">
                 Date or renewal
                 <input
@@ -1398,8 +1609,7 @@ function WorkspaceModal({ modal, store, close, onSubmit, onDelete }) {
                 />
               </label>
               <div className="form-help">
-                This demo saves text and dates in this browser only. It does not
-                upload or protect files.
+                Image is kept in memory for this demo session and is not uploaded. Use sample, non-sensitive images only. A real service must store attachments privately and grant time-limited access only after server-side verification.
               </div>
               <div className="modal-actions full-field">
                 {modal.kind === "Document" && !modal.record ? (
@@ -1452,6 +1662,7 @@ function WorkspaceModal({ modal, store, close, onSubmit, onDelete }) {
                 <select
                   name="role"
                   defaultValue={modal.person?.role || "Trusted contact"}
+                  required
                 >
                   <option>Family contact</option>
                   <option>Trusted contact</option>
@@ -1470,13 +1681,30 @@ function WorkspaceModal({ modal, store, close, onSubmit, onDelete }) {
                 />
               </label>
               <label className="form-field">
-                Phone (optional)
-                <input
-                  name="phone"
-                  type="tel"
-                  defaultValue={modal.person?.phone || ""}
-                  placeholder="+91 98765 43210"
-                />
+                Phone
+                <div className="phone-input-row">
+                  <select
+                    name="phoneCountryCode"
+                    aria-label="Phone country calling code"
+                    defaultValue={splitPhone(modal.person?.phone).code}
+                  >
+                    {callingCodes.map(([code, label]) => (
+                      <option value={code} key={code}>{label}</option>
+                    ))}
+                  </select>
+                  <input
+                    name="phone"
+                    type="tel"
+                    inputMode="numeric"
+                    autoComplete="tel-national"
+                    defaultValue={splitPhone(modal.person?.phone).number}
+                    placeholder="10-digit number"
+                    required
+                    pattern="[0-9]{10}"
+                    maxLength={10}
+                    title="Enter exactly 10 digits."
+                  />
+                </div>
               </label>
               <label className="form-field full-field">
                 Relationship (optional)
@@ -1487,12 +1715,11 @@ function WorkspaceModal({ modal, store, close, onSubmit, onDelete }) {
                 />
               </label>
               <p className="form-help full-field">
-                Use an international calling code for phone numbers. No
-                invitation is sent.
+                This demo cannot send OTPs or verify identity, so this person remains pending and cannot access assigned records. A production flow should verify email and phone through private, expiring server challenges, and use a compliant identity-verification provider without storing Aadhaar/PAN in browser storage.
               </p>
               <div className="modal-actions full-field">
                 <button className="button button-primary" type="submit">
-                  {modal.person ? "Save changes" : "Add trusted person"}
+                  {modal.person ? "Save as pending" : "Add as pending"}
                 </button>
               </div>
             </>
@@ -1535,24 +1762,48 @@ function WorkspaceModal({ modal, store, close, onSubmit, onDelete }) {
               </label>
               <fieldset className="record-picker full-field">
                 <legend>Select records</legend>
-                {store.records.map((record) => (
-                  <label key={record.id}>
-                    <input
-                      type="checkbox"
-                      name="recordIds"
-                      value={record.id}
-                      defaultChecked={modal.policy?.recordIds?.includes(
-                        record.id,
-                      )}
-                    />
-                    <span>
-                      <strong>{record.name}</strong>
-                      <small>
-                        {record.kind} · {record.category}
-                      </small>
-                    </span>
-                  </label>
-                ))}
+                {store.records.length ? (
+                  store.records.map((record) => (
+                    <label key={record.id}>
+                      <input
+                        type="checkbox"
+                        name="recordIds"
+                        value={record.id}
+                        defaultChecked={modal.policy?.recordIds?.includes(
+                          record.id,
+                        )}
+                      />
+                      <span>
+                        <strong>{record.name}</strong>
+                        <small>
+                          {record.kind} · {record.category}
+                        </small>
+                      </span>
+                    </label>
+                  ))
+                ) : (
+                  <div className="record-picker-empty">
+                    <span>No records yet. Add a record before assigning anything.</span>
+                    <button
+                      type="button"
+                      className="button button-secondary"
+                      onClick={(event) => {
+                        const values = new FormData(event.currentTarget.form);
+                        onAddRecord({
+                          type: "policy",
+                          policy: {
+                            ...modal.policy,
+                            ...Object.fromEntries(values),
+                            recordIds: values.getAll("recordIds"),
+                            channels: values.getAll("channels"),
+                          },
+                        });
+                      }}
+                    >
+                      Add a record
+                    </button>
+                  </div>
+                )}
               </fieldset>
               <label className="form-field full-field">
                 Access condition
@@ -1568,12 +1819,26 @@ function WorkspaceModal({ modal, store, close, onSubmit, onDelete }) {
                   <option>At a date I choose</option>
                 </select>
               </label>
+              <fieldset className="record-picker full-field">
+                <legend>Notify this person after the continuity review</legend>
+                <label>
+                  <input type="checkbox" name="channels" value="Email" defaultChecked={modal.policy?.channels?.includes("Email") ?? true} />
+                  <span><strong>Email</strong><small>Invitation link is sent only after the release condition is approved.</small></span>
+                </label>
+                <label>
+                  <input type="checkbox" name="channels" value="WhatsApp" defaultChecked={modal.policy?.channels?.includes("WhatsApp") ?? true} />
+                  <span><strong>WhatsApp</strong><small>Requires explicit recipient consent and an approved messaging provider.</small></span>
+                </label>
+              </fieldset>
               <p className="form-help full-field">
-                A missed check-in alone never triggers release. This is a policy
-                preview only.
+                A missed check-in alone never triggers release. This demo only saves the notification preferences; it does not send messages or release data.
               </p>
               <div className="modal-actions full-field">
-                <button className="button button-primary" type="submit">
+                <button
+                  className="button button-primary"
+                  type="submit"
+                  disabled={!store.records.length}
+                >
                   {modal.policy ? "Save policy" : "Create policy"}
                 </button>
               </div>

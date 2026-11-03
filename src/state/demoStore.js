@@ -15,7 +15,23 @@ export function readDemoStore() {
 
   try {
     const stored = window.localStorage.getItem(STORE_KEY);
-    return stored ? { ...emptyStore, ...JSON.parse(stored) } : emptyStore;
+    if (!stored) return emptyStore;
+    const parsed = JSON.parse(stored);
+    return {
+      ...emptyStore,
+      ...parsed,
+      records: (Array.isArray(parsed.records) ? parsed.records : []).map(
+        ({ imageData, ...record }) => record,
+      ),
+      people: (Array.isArray(parsed.people) ? parsed.people : []).map(
+        ({ aadhaar, pan, emailOtp, phoneOtp, ...person }) => ({
+          ...person,
+          verificationStatus: "pending",
+          emailVerified: false,
+          phoneVerified: false,
+        }),
+      ),
+    };
   } catch {
     return emptyStore;
   }
@@ -23,7 +39,12 @@ export function readDemoStore() {
 
 export function writeDemoStore(store) {
   try {
-    window.localStorage.setItem(STORE_KEY, JSON.stringify(store));
+    const { records, ...rest } = store;
+    const persistentStore = {
+      ...rest,
+      records: records.map(({ imageData, ...record }) => record),
+    };
+    window.localStorage.setItem(STORE_KEY, JSON.stringify(persistentStore));
   } catch {
     // Keep the demo usable if browser storage is unavailable.
   }
